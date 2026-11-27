@@ -25,4 +25,15 @@ public class UserRepository : IUserRepository
         await _context.Users.AddAsync(user);
         await _context.SaveChangesAsync();
     }
+
+    public async Task UpdateAsync(User user)
+    {
+        // GetByIdAsync usa FindAsync, que devolve a entidade já rastreada pelo
+        // change tracker: nesse caso o SaveChanges gera um UPDATE só nas colunas
+        // que mudaram. O Update() explícito fica para entidades desanexadas.
+        if (_context.Entry(user).State == EntityState.Detached)
+            _context.Users.Update(user);
+
+        await _context.SaveChangesAsync();
+    }
 }

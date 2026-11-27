@@ -1,3 +1,4 @@
+﻿using FinanceManager.API.Middleware;
 using FinanceManager.Application.Auth;
 using FinanceManager.Application.Auth.Commands.Register;
 using FinanceManager.Domain.Interfaces;
@@ -7,6 +8,7 @@ using FinanceManager.Infrastructure.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using Microsoft.OpenApi;
 using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -54,9 +56,33 @@ builder.Services.AddCors(options =>
 
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddControllers();
-builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
+
+// Swagger com autenticação Bearer, para dar pra testar os endpoints
+// protegidos direto na UI.
+builder.Services.AddSwaggerGen(options =>
+{
+    options.SwaggerDoc("v1", new OpenApiInfo
+    {
+        Title = "Fluxo API",
+        Version = "v1",
+        Description = "API do Fluxo - gestão de finanças pessoais."
+    });
+
+    options.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
+    {
+        Name = "Authorization",
+        Type = SecuritySchemeType.Http,
+        Scheme = "bearer",
+        BearerFormat = "JWT",
+        In = ParameterLocation.Header,
+        Description = "Cole apenas o token devolvido por /api/Auth/login (sem a palavra 'Bearer')."
+    });
+
+    options.AddSecurityRequirement(document => new OpenApiSecurityRequirement
+    {
+        { new OpenApiSecuritySchemeReference("Bearer", document), new List<string>() }
+    });
+});
 
 var app = builder.Build();
 
@@ -66,6 +92,10 @@ using (var scope = app.Services.CreateScope())
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     db.Database.Migrate();
 }
+
+// Primeiro da linha: captura o que vier de dentro do pipeline e traduz
+// em ProblemDetails.
+app.UseMiddleware<ExceptionHandlingMiddleware>();
 
 if (app.Environment.IsDevelopment())
 {
